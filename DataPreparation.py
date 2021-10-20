@@ -1,8 +1,12 @@
 import os
 
+import torch
+from PIL import Image
+from torchvision import transforms
+
 
 class DataPreparation:
-    def __init__(self, directory, datasets, target):
+    def __init__(self, directory, datasets, target, train_valid):
         self.images_train = []
         self.groundtruth_train = []
         self.groundtruth_valid = []
@@ -10,8 +14,8 @@ class DataPreparation:
         self.directory = directory
         self.datasets = datasets
         self.target = target
+        self.train_valid = train_valid
 
-    def load_data(self):
         for dataset in self.datasets:
             groundtruth_prefix = dataset + '/Groundtruth/'
             image_prefix = dataset + '/Image/'
@@ -32,4 +36,27 @@ class DataPreparation:
                     self.images_train.append(filenames_images[i])
                     self.groundtruth_train.append(filenames_groundtruth[i])
 
-        return self.images_train, self.groundtruth_train, self.images_valid, self.groundtruth_valid
+    def __len__(self):
+        if self.train_valid == 'train':
+            return len(self.groundtruth_train)
+        elif self.train_valid == 'valid':
+            return len(self.groundtruth_valid)
+
+    def __getitem__(self, item):
+        image = None
+        ground_truth = None
+
+        if torch.is_tensor(item):
+            item = item.tolist()
+
+        if self.train_valid == 'train':
+            image = Image.open(self.images_train[item])
+            ground_truth = Image.open(self.groundtruth_train[item])
+        elif self.train_valid == 'valid':
+            image = Image.open(self.images_valid[item])
+            ground_truth = Image.open(self.groundtruth_valid[item])
+
+        image = transforms.ToTensor()(image)
+        ground_truth = transforms.ToTensor()(ground_truth)
+
+        return image, ground_truth

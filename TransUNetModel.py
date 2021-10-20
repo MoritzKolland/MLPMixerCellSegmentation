@@ -106,7 +106,7 @@ class Embeddings(nn.Module):
         x = x.flatten(2)
         x = x.transpose(-1, -2)
 
-        embeddings = x + self.patch_embeddings
+        embeddings = x + self.position_embedding
         embeddings = self.dropout(embeddings)
 
         return embeddings, features
@@ -204,10 +204,10 @@ class DecoderBlock(nn.Module):
 
 
 class SegmentationHead(nn.Sequential):
-    def __init__(self, in_channels, out_channels, kernel_size=3, upsampling=2):
+    def __init__(self, in_channels, out_channels, kernel_size=3, upsampling=1):
         conv2d = nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
                            kernel_size=kernel_size, padding=kernel_size // 2)
-        upsampling = nn.UpsamplingBilinear2d(scale_factor=upsampling) if upsampling > 1 else nn.Identity
+        upsampling = nn.UpsamplingBilinear2d(scale_factor=upsampling)
         super().__init__(conv2d, upsampling)
 
 
@@ -215,7 +215,7 @@ class DecoderCup(nn.Module):
     def __init__(self, hidden_size, decoder_channels, n_skip, skip_channels):
         super().__init__()
         head_channels = 512
-        self.conf_more = Conv2dReLU(hidden_size, head_channels, kernel_size=3, padding=1, use_batchnorm=True)
+        self.conv_more = Conv2dReLU(hidden_size, head_channels, kernel_size=3, padding=1, use_batchnorm=True)
         in_channels = [head_channels] + list(decoder_channels[:-1])
         out_channels = decoder_channels
 
@@ -232,7 +232,7 @@ class DecoderCup(nn.Module):
 
     def forward(self, hidden_states, features=None):
         b, n_patch, hidden = hidden_states.size()
-        h, w = int(np.sqrt(n_patch), int(np.sqrt(n_patch)))
+        h, w = int(np.sqrt(n_patch)), int(np.sqrt(n_patch))
         x = hidden_states.permute(0, 2, 1)
         x = x.contiguous().view(b, hidden, h, w)
         x = self.conv_more(x)
@@ -269,8 +269,6 @@ class VisionTransformer(nn.Module):
                                                   out_channels=n_classes, kernel_size=3)
 
     def forward(self, x):
-        if x.size()[1] == 1:
-            x = x.repeat(1, 3, 1, 1)
         x, attn_weights, features, = self.transformer(x)
         x = self.decoder(x, features)
         logits = self.segmentation_head(x)

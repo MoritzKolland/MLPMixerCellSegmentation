@@ -1,6 +1,7 @@
 from torch.utils.data import DataLoader
 
 from DataPreparation import DataPreparation
+from SupervisedLearning import SupervisedLearning
 from TransUNetModel import VisionTransformer
 
 if __name__ == '__main__':
@@ -10,13 +11,12 @@ if __name__ == '__main__':
     TARGET = ['TNBC']
     BATCH_SIZE = 16
 
-    dataPreparation = DataPreparation(DATA_DIRECTORY, DATASETS, TARGET)
-
     print("load data")
-    images_train, groundtruth_train, images_valid, groundtruth_valid = dataPreparation.load_data()
+    train_data = DataPreparation(DATA_DIRECTORY, DATASETS, TARGET, 'train')
+    val_data = DataPreparation(DATA_DIRECTORY, DATASETS, TARGET, 'valid')
 
-    train_loader = DataLoader(images_train, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(groundtruth_train, batch_size=BATCH_SIZE, shuffle=True)
+    train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
 
     print("load model")
     attention_dropout_rate = 0.0
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     grid_size = (16, 16)
     hidden_size = 1024
     mlp_dim = 4096
-    n_classes = 2
+    n_classes = 1
     n_skip = 3
     num_attention_head = 16
     num_resnet_layers = (3, 4, 9)
@@ -49,7 +49,15 @@ if __name__ == '__main__':
                               skip_channels=skip_channels,
                               width_factor=width_factor
                               )
-
     print("start training")
 
-    print("training ended")
+    epochs = 10
+    learning_rate = 0.001
+    weight_decay = 0.01
+
+    supervised_learning = SupervisedLearning(model=model, epochs=epochs, train_loader=train_loader,
+                                             val_loader=val_loader, learning_rate=learning_rate,
+                                             weight_decay=weight_decay)
+    train_loss_epoch = supervised_learning.train()
+
+    print("show results")
